@@ -22,7 +22,7 @@ export const rateLimit = (option: RateLimiterOptions) => {
 
       const redisKey = `${RATE_LIMIT_PREFIX}:${rawKey}`;
       if (!option.slidingWindow) {
-        const count = await rateLimitService.increment(redisKey, windowMs);
+        const count = await rateLimitService.fixedWindow(redisKey, windowMs);
 
         if (count > limit) {
           if (option.handler) {

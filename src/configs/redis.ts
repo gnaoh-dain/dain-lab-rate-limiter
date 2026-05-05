@@ -8,3 +8,4 @@ const redisClient = createClient({
 redisClient.on('error', (err) => console.error('Redis Client Error', err));
 
 export { redisClient };
+export type RedisInstance = typeof redisClient;

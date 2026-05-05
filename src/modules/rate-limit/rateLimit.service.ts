@@ -1,37 +1,47 @@
-import { redisClient } from '../../configs/redis';
-import fs from 'fs';
-import path from 'path';
+import { loadLuaScript } from './luaLoader';
+import { redisClient, RedisInstance } from '../../configs/redis';
 
-const luaPath = path.join(__dirname, 'scripts', 'slidingWindow.lua');
+export class RateLimitService {
+  private redis: RedisInstance;
+  private slidingScript: string;
+  private slidingSha?: string;
 
-const luaScript = fs.readFileSync(luaPath, 'utf-8');
-
-async function increment(key: string, windowMs: number): Promise<number> {
-  const count = await redisClient.incr(key);
-  if (count === 1) {
-    await redisClient.pExpire(key, windowMs);
+  constructor(redisClient: RedisInstance) {
+    this.redis = redisClient;
+    this.slidingScript = loadLuaScript('slidingWindow.lua');
   }
-  return count;
+
+  async init() {
+    this.slidingSha = await this.redis.scriptLoad(this.slidingScript);
+  }
+
+  async fixedWindow(key: string, windowMs: number): Promise<number> {
+    const count = await this.redis.incr(key);
+    if (count === 1) {
+      await this.redis.pExpire(key, windowMs);
+    }
+    return count;
+  }
+
+  async slidingWindowLua(
+    key: string,
+    windowMs: number,
+    limit: number
+  ): Promise<{ allowed: boolean; count: number }> {
+    const now = Date.now();
+    if (!this.slidingSha) await this.init();
+
+    try {
+      const result = await this.redis.evalSha(this.slidingSha!, {
+        keys: [key],
+        arguments: [now.toString(), windowMs.toString(), limit.toString()],
+      });
+      const [allowed, count] = result as [number, number];
+      return { allowed: allowed === 1, count };
+    } catch (err) {
+      throw err;
+    }
+  }
 }
 
-async function slidingWindowLua(
-  key: string,
-  windowMs: number,
-  limit: number
-): Promise<{ allowed: boolean; count: number }> {
-  const now = Date.now();
-
-  const result = (await redisClient.eval(luaScript, {
-    keys: [key],
-    arguments: [now.toString(), windowMs.toString(), limit.toString()],
-  })) as [number, number];
-
-  return {
-    allowed: result[0] === 1,
-    count: result[1],
-  };
-}
-export const rateLimitService = {
-  increment,
-  slidingWindowLua,
-};
+export const rateLimitService = new RateLimitService(redisClient);
