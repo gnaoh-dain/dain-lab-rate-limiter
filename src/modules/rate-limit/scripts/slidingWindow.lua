@@ -18,7 +18,10 @@ local count = redis.call("ZCARD", key)
 
 -- 3. check limit
 if count >= limit then
-  return {0, count}
+  local oldest = redis.call("ZRANGE", key, 0, 0, "WITHSCORES")
+  local oldest_time = tonumber(oldest[2])
+  local retry_after = window - (now - oldest_time)
+  return {0, count, retry_after}
 end
 
 -- 4. add new request

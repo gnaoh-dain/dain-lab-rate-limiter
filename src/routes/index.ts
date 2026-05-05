@@ -1,5 +1,6 @@
 import express from 'express';
 import { rateLimit } from '../modules/rate-limit/rateLimit.middleware';
+import rateLimitHandler from '../middlewares/errorHandler';
 
 const router = express.Router();
 
@@ -14,6 +15,14 @@ router.get(
     windowMs: 60 * 1000, // 1 minute,
     keyGenerator: (req) => `${req.ip}:${req.path}`,
     slidingWindow: true,
+    handler: (req, res, ctx) => {
+      if (req.path === '/public') {
+        return res.status(429).json({
+          message: 'Public endpoint rate limit exceeded',
+        });
+      }
+      return rateLimitHandler(req, res, ctx);
+    },
   }),
   (req, res) => {
     return res
@@ -29,6 +38,7 @@ router.get(
     windowMs: 60 * 1000, // 1 minute,
     keyGenerator: (req) => `${req.ip}:${req.path}`,
     slidingWindow: true,
+    handler: (req, res, ctx) => rateLimitHandler(req, res, ctx),
   }),
   (req, res) => {
     return res

@@ -7,6 +7,10 @@ export interface RateLimiterOptions {
   keyGenerator?: (req: Request) => string;
   skip?: (req: Request) => boolean;
 
-  handler?: (req: Request, res: Response) => void;
+  handler?: (
+    req: Request,
+    res: Response,
+    ctx: { limit: number; remaining: number; retryAfter?: number }
+  ) => void;
   slidingWindow?: boolean;
 }

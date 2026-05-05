@@ -26,21 +26,18 @@ export const rateLimit = (option: RateLimiterOptions) => {
 
         if (count > limit) {
           if (option.handler) {
-            return option.handler(req, res);
+            return option.handler(req, res, { limit, remaining: 0 });
           } else {
             return res.status(429).json({ message: 'Too many requests' });
           }
         }
       } else {
-        const { allowed } = await rateLimitService.slidingWindowLua(
-          redisKey,
-          windowMs,
-          limit
-        );
+        const { allowed, count, retryAfter, remaining } =
+          await rateLimitService.slidingWindowLua(redisKey, windowMs, limit);
 
         if (!allowed) {
           if (option.handler) {
-            return option.handler(req, res);
+            return option.handler(req, res, { limit, remaining, retryAfter });
           } else {
             return res.status(429).json({ message: 'Too many requests' });
           }

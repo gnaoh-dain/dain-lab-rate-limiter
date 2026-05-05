@@ -27,7 +27,12 @@ export class RateLimitService {
     key: string,
     windowMs: number,
     limit: number
-  ): Promise<{ allowed: boolean; count: number }> {
+  ): Promise<{
+    allowed: boolean;
+    count: number;
+    remaining: number;
+    retryAfter: number;
+  }> {
     const now = Date.now();
     if (!this.slidingSha) await this.init();
 
@@ -36,8 +41,9 @@ export class RateLimitService {
         keys: [key],
         arguments: [now.toString(), windowMs.toString(), limit.toString()],
       });
-      const [allowed, count] = result as [number, number];
-      return { allowed: allowed === 1, count };
+      const [allowed, count, retryAfter] = result as [number, number, number];
+      const remaining = Math.max(0, limit - count);
+      return { allowed: allowed === 1, count, remaining, retryAfter };
     } catch (err) {
       throw err;
     }
